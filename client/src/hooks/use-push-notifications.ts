@@ -8,36 +8,38 @@ function urlBase64ToUint8Array(base64String: string) {
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = window.atob(base64);
   const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
   return outputArray;
 }
 
-/**
- * Convert ArrayBuffer key (p256dh/auth) to Base64 string for storage/transport.
- * Note: PushSubscription.getKey() returns an ArrayBuffer.
- */
 function arrayBufferToBase64(buf: ArrayBuffer) {
   const bytes = new Uint8Array(buf);
   let binary = "";
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
   return window.btoa(binary);
 }
 
 async function ensureServiceWorkerReady() {
-  // Ensure SW is registered at root (so it can control the whole app)
-  // This call is idempotent in modern browsers.
   await navigator.serviceWorker.register("/sw.js");
   return navigator.serviceWorker.ready;
 }
 
 async function fetchPublicVapidKey(): Promise<string> {
   const res = await fetch("/api/push/public-key");
+
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Public key unavailable: HTTP ${res.status} ${text}`);
+    throw new Error("Не вдалося отримати публічний ключ сповіщень");
   }
-  const data = (await res.json()) as { publicKey?: string };
-  if (!data.publicKey) throw new Error("Public key missing in response");
+
+  const data = await res.json();
+  if (!data.publicKey) {
+    throw new Error("Публічний ключ відсутній");
+  }
+
   return data.publicKey;
 }
 
@@ -50,7 +52,10 @@ export function usePushNotifications() {
     mutationFn: async (subscription: PushSubscription) => {
       const p256dh = subscription.getKey("p256dh");
       const auth = subscription.getKey("auth");
-      if (!p256dh || !auth) throw new Error("Missing subscription keys (p256dh/auth)");
+
+      if (!p256dh || !auth) {
+        throw new Error("Відсутні ключі підписки");
+      }
 
       const body = {
         endpoint: subscription.endpoint,
@@ -67,33 +72,32 @@ export function usePushNotifications() {
       });
 
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Failed to subscribe on server: HTTP ${res.status} ${text}`);
+        throw new Error("Не вдалося зберегти підписку");
       }
 
       return res.json();
     },
+
     onSuccess: () => {
       setIsSubscribed(true);
       toast({
-        title: "Notifications Enabled",
-        description: "You will be notified when new marks appear.",
+        title: "Сповіщення увімкнено",
+        description: "Ви будете отримувати повідомлення про нові мітки.",
       });
     },
+
     onError: (err) => {
-      console.error("Subscription failed:", err);
+      console.error("Push subscribe error:", err);
       toast({
-        title: "Error",
-        description: "Could not enable notifications.",
+        title: "Помилка",
+        description: "Не вдалося увімкнути сповіщення.",
         variant: "destructive",
       });
     },
   });
 
-  // Initial capability + status check
   useEffect(() => {
     const supported =
-      typeof window !== "undefined" &&
       "serviceWorker" in navigator &&
       "PushManager" in window &&
       "Notification" in window;
@@ -107,8 +111,7 @@ export function usePushNotifications() {
         const reg = await ensureServiceWorkerReady();
         const sub = await reg.pushManager.getSubscription();
         setIsSubscribed(!!sub);
-      } catch (e) {
-        console.warn("Push init check failed:", e);
+      } catch {
         setIsSubscribed(false);
       }
     })();
@@ -118,42 +121,31 @@ export function usePushNotifications() {
     if (!isSupported) return;
 
     try {
-      // Permission must be requested from a user gesture (button click)
       const permission = await Notification.requestPermission();
+
       if (permission !== "granted") {
-        throw new Error("Permission denied");
+        throw new Error("Дозвіл не надано");
       }
 
       const reg = await ensureServiceWorkerReady();
-
-      // Always use the server-provided key (must match server VAPID)
       const publicKey = await fetchPublicVapidKey();
-      const appServerKey = urlBase64ToUint8Array(publicKey);
 
-      // If there is an existing subscription created with a different key, drop it.
       const existing = await reg.pushManager.getSubscription();
       if (existing) {
-        try {
-          // Attempt to detect mismatch by re-subscribing; simplest reliable approach:
-          // unsubscribe existing then create a fresh subscription with the correct key.
-          await existing.unsubscribe();
-        } catch (e) {
-          console.warn("Failed to unsubscribe existing subscription:", e);
-        }
+        await existing.unsubscribe();
       }
 
       const subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: appServerKey,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
 
       subscribeMutation.mutate(subscription);
     } catch (error) {
-      console.error("Failed to subscribe:", error);
+      console.error("Subscribe failed:", error);
       toast({
-        title: "Permission / Setup Error",
-        description:
-          "Could not enable notifications. Please allow notifications and try again.",
+        title: "Дозвіл відхилено",
+        description: "Дозвольте сповіщення в налаштуваннях браузера.",
         variant: "destructive",
       });
     }
