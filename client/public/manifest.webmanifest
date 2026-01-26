@@ -1,6 +1,6 @@
 {
-  "name": "Fleeting Marks",
-  "short_name": "Marks",
+  "name": "Маяк",
+  "short_name": "Маяк",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
