@@ -15,7 +15,7 @@ export function MarkPopup({ mark }: MarkPopupProps) {
       ? "Синя"
       : mark.color === "green"
       ? "Зелена"
-      : "Змішані";
+      : "Змішана";
 
   const colorClass =
     mark.color === "blue"
