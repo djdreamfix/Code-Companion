@@ -35,7 +35,7 @@ export function MapControls({
   return (
     <>
       {/* Кнопки справа зверху */}
-<div className="absolute right-4 z-[1000] flex flex-col gap-3 top-[calc(env(safe-area-inset-top)+16px)]">
+<div className="absolute right-4 z-[1000] flex flex-col gap-3 top-[calc(env(safe-area-inset-top)+32px)]">
         {notificationsSupported && (
           <Button
             variant="secondary"
