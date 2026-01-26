@@ -8,11 +8,20 @@ import { randomUUID } from "crypto";
 import webpush from "web-push";
 
 // Generated keys for demo purposes
-const VAPID_KEYS = {
-  publicKey: "BG6M1vEE3vDPhOJCkQiLZOpyE2xzk2cUuxOMRXulqMR90WNOBZNn51kvoDyhMutsWX8qWzROzEBckQk3ylQiOis",
-  privateKey: "RgKrwzUtiQRanmqHG5YtHsiwWx8OXo2Ar2A00EE28Eo",
-  subject: "mailto:admin@example.com"
-};
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY!;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY!;
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:djdreamfix@gmail.com";
+
+if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+  throw new Error("Missing VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY");
+}
+
+webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+
+app.get("/api/push/public-key", (req, res) => {
+  res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
 
 export async function registerRoutes(
   httpServer: Server,
@@ -28,7 +37,7 @@ export async function registerRoutes(
   // Setup Socket.IO
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: "*", // Adjust for production
+      origin: ["https://code-companion-fghd.onrender.com"],
       methods: ["GET", "POST"]
     }
   });
@@ -77,7 +86,11 @@ export async function registerRoutes(
         title: "New Mark!",
         body: `A new ${colorName} mark was placed.`,
         icon: "/icons/icon-192.png",
-        data: { id: newMark.id }
+        data: { 
+          id: newMark.id,
+          url: `/?mark=${newMark.id}`
+        }
+
       });
 
       const subs = await storage.getSubscriptions();
