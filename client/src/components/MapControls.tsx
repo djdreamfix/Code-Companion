@@ -35,10 +35,7 @@ export function MapControls({
   return (
     <>
       {/* Кнопки справа зверху */}
-<div
-  className="absolute right-4 z-[1000] flex flex-col gap-3"
-  style={{ top: "calc(env(safe-area-inset-top) + 16px)" }} // 16px ≈ top-4
->
+<div className="absolute right-4 z-[1000] flex flex-col gap-3 top-[calc(env(safe-area-inset-top)+16px)]">
         {notificationsSupported && (
           <Button
             variant="secondary"
