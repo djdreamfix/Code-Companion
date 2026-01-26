@@ -7,6 +7,16 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import webpush from "web-push";
 
+function isVapidMismatch(err: any) {
+  const body = err?.body;
+  const msg = typeof body === "string" ? body : JSON.stringify(body ?? "");
+  return (
+    err?.statusCode === 403 ||
+    msg.includes("VapidPkHashMismatch") ||
+    msg.toLowerCase().includes("vapid") && msg.toLowerCase().includes("mismatch")
+  );
+}
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   // Safety: show real startup errors in Render logs
   process.on("unhandledRejection", (err) => console.error("unhandledRejection:", err));
@@ -21,12 +31,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   if (webPushEnabled) {
     webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY!, VAPID_PRIVATE_KEY!);
-    app.get("/api/push/public-key", (req, res) => res.json({ publicKey: VAPID_PUBLIC_KEY }));
+
+    app.get("/api/push/public-key", (req, res) => {
+      res.json({ publicKey: VAPID_PUBLIC_KEY });
+    });
   } else {
     console.warn("WebPush disabled: missing VAPID keys");
-    app.get("/api/push/public-key", (req, res) =>
-      res.status(503).json({ error: "WebPush disabled" })
-    );
+
+    app.get("/api/push/public-key", (req, res) => {
+      res.status(503).json({ error: "WebPush disabled" });
+    });
   }
 
   // Socket.IO
@@ -69,13 +83,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       // Push (only if enabled)
       if (webPushEnabled) {
-        const colorName =
-          input.color === "blue" ? "Blue" : input.color === "green" ? "Green" : "Split";
+        const colorUa =
+          input.color === "blue"
+            ? "синю"
+            : input.color === "green"
+            ? "зелену"
+            : "змішану";
 
         const payload = JSON.stringify({
-          title: "New Mark!",
-          body: `A new ${colorName} mark was placed.`,
+          title: "Нова мітка!",
+          body: `Додано нову ${colorUa} мітку.`,
           icon: "/icons/icon-192.png",
+          badge: "/icons/icon-192.png",
           data: { id: newMark.id, url: `/?mark=${newMark.id}` },
         });
 
@@ -89,11 +108,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
                 payload
               );
             } catch (err: any) {
+              // 404/410 = subscription expired
               if (err?.statusCode === 410 || err?.statusCode === 404) {
                 await storage.deleteSubscription(sub.endpoint);
-              } else {
-                console.error("webpush error", err?.statusCode, err?.body || err);
+                return;
               }
+
+              // VAPID mismatch = subscription created with another VAPID public key
+              if (isVapidMismatch(err)) {
+                console.error("webpush vapid mismatch -> deleting subscription", sub.endpoint);
+                await storage.deleteSubscription(sub.endpoint);
+                return;
+              }
+
+              console.error("webpush error", err?.statusCode, err?.body || err);
             }
           })
         );
@@ -112,8 +140,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Subscribe to Push
   app.post(api.push.subscribe.path, async (req, res) => {
     try {
+      if (!webPushEnabled) {
+        return res.status(503).json({ error: "WebPush disabled" });
+      }
+
       const input = api.push.subscribe.input.parse(req.body);
 
+      // Рекомендація: бажано робити upsert по endpoint, щоб не плодити дублікати.
+      // Якщо ваш storage.createSubscription вже так робить — ок.
       await storage.createSubscription({
         id: randomUUID(),
         endpoint: input.endpoint,
