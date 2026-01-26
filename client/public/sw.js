@@ -1,33 +1,29 @@
 /* global self */
-const CACHE = 'fm-cache-v1';
+const CACHE = 'fm-cache-v2';
 
-// Install: precache basic assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) =>
-      cache.addAll([
-        '/',
-        '/index.html',
-        '/manifest.webmanifest'
-      ])
+      cache.addAll(['/', '/index.html', '/manifest.webmanifest'])
     )
   );
   self.skipWaiting();
 });
 
-// Activate
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// Runtime cache for map tiles (simple)
+// Map tile caching
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
   if (url.hostname.includes('tile.openstreetmap.org')) {
     event.respondWith(
       caches.open(CACHE).then(async (cache) => {
         const cached = await cache.match(event.request);
         if (cached) return cached;
+
         const res = await fetch(event.request);
         cache.put(event.request, res.clone());
         return res;
@@ -36,29 +32,51 @@ self.addEventListener('fetch', (event) => {
   }
 });
 
-// Push handler
+// PUSH
 self.addEventListener('push', (event) => {
   if (!event.data) return;
-  const payload = event.data.json();
+
+  let payload;
+
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = {
+      title: 'New Mark',
+      body: event.data.text(),
+      data: { url: '/' }
+    };
+  }
+
   const { title, body, icon, data } = payload;
+
   event.waitUntil(
     self.registration.showNotification(title || 'New Mark', {
-      body,
+      body: body || '',
       icon: icon || '/icons/icon-192.png',
-      data
+      badge: '/icons/icon-192.png',
+      requireInteraction: true,
+      vibrate: [100, 50, 100],
+      data: data || { url: '/' }
     })
   );
 });
 
-// Notification click
+// CLICK
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = self.location.origin + '/';
+
+  const targetUrl = event.notification.data?.url || '/';
+
   event.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then((clientsArr) => {
-      const hadWindow = clientsArr.find((c) => c.url === url);
-      if (hadWindow) return hadWindow.focus();
-      return self.clients.openWindow(url);
-    })
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clients) => {
+        for (const client of clients) {
+          if (client.url.includes(targetUrl)) {
+            return client.focus();
+          }
+        }
+        return self.clients.openWindow(targetUrl);
+      })
   );
 });
