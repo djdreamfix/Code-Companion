@@ -8,19 +8,18 @@ import { randomUUID } from "crypto";
 import webpush from "web-push";
 
 // Generated keys for demo purposes
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY!;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY!;
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:djdreamfix@gmail.com";
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
 
-if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-  throw new Error("Missing VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY");
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  app.get("/api/push/public-key", (req, res) => res.json({ publicKey: VAPID_PUBLIC_KEY }));
+} else {
+  console.warn("WebPush disabled: missing VAPID keys");
+  app.get("/api/push/public-key", (req, res) => res.status(503).json({ error: "WebPush disabled" }));
 }
 
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-
-app.get("/api/push/public-key", (req, res) => {
-  res.json({ publicKey: VAPID_PUBLIC_KEY });
-});
 
 
 export async function registerRoutes(
