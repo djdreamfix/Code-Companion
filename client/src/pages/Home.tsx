@@ -293,7 +293,7 @@ export default function Home() {
       />
 
       {/* Brand Overlay */}
-      <div className="absolute top-16 left-4 z-[1000] pointer-events-none">
+<div className="absolute right-4 z-[1000] flex flex-col gap-3 top-[calc(env(safe-area-inset-top)+16px)] pointer-events-none">
         <div className="glass-panel px-4 py-2 rounded-xl flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
           <h1 className="font-display font-bold text-lg text-foreground">Мітки на мапі</h1>
