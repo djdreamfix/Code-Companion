@@ -1,82 +1,115 @@
 /* global self */
-const CACHE = 'fm-cache-v2';
+const CACHE = "fm-cache-v2";
 
-self.addEventListener('install', (event) => {
+// Що кешуємо наперед (App Shell)
+const PRECACHE_URLS = ["/", "/index.html", "/manifest.webmanifest"];
+
+self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) =>
-      cache.addAll(['/', '/index.html', '/manifest.webmanifest'])
-    )
+    caches.open(CACHE).then((cache) => {
+      return cache.addAll(PRECACHE_URLS);
+    })
   );
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      // За потреби можна тут чистити старі кеші:
+      // const keys = await caches.keys();
+      // await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
+
+      await self.clients.claim();
+    })()
+  );
 });
 
-// Map tile caching
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+// Кешування тайлів карти (OSM)
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
 
-  if (url.hostname.includes('tile.openstreetmap.org')) {
+  // Не чіпаємо не-GET запити
+  if (req.method !== "GET") return;
+
+  const url = new URL(req.url);
+
+  // Кешуємо лише тайли OpenStreetMap
+  if (url.hostname.includes("tile.openstreetmap.org")) {
     event.respondWith(
-      caches.open(CACHE).then(async (cache) => {
-        const cached = await cache.match(event.request);
+      (async () => {
+        const cache = await caches.open(CACHE);
+        const cached = await cache.match(req);
         if (cached) return cached;
 
-        const res = await fetch(event.request);
-        cache.put(event.request, res.clone());
+        const res = await fetch(req);
+        // Кладемо в кеш лише успішні відповіді
+        if (res && res.ok) {
+          cache.put(req, res.clone());
+        }
         return res;
-      })
+      })()
     );
   }
 });
 
-// PUSH
-self.addEventListener('push', (event) => {
+// PUSH-повідомлення
+self.addEventListener("push", (event) => {
   if (!event.data) return;
 
   let payload;
 
   try {
+    // Очікуємо JSON з сервера
     payload = event.data.json();
   } catch {
+    // Якщо прийшов не JSON — формуємо базове повідомлення
     payload = {
-      title: 'New Mark',
+      title: "Нова мітка",
       body: event.data.text(),
-      data: { url: '/' }
+      data: { url: "/" },
     };
   }
 
-  const { title, body, icon, data } = payload;
+  const title = payload?.title || "Нова мітка";
+  const body = payload?.body || "";
+  const icon = payload?.icon || "/icons/icon-192.png";
+  const data = payload?.data || { url: "/" };
 
   event.waitUntil(
-    self.registration.showNotification(title || 'New Mark', {
-      body: body || '',
-      icon: icon || '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
+    self.registration.showNotification(title, {
+      body,
+      icon,
+      badge: "/icons/icon-192.png",
       requireInteraction: true,
       vibrate: [100, 50, 100],
-      data: data || { url: '/' }
+      data,
     })
   );
 });
 
-// CLICK
-self.addEventListener('notificationclick', (event) => {
+// Клік по нотифікації
+self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const targetUrl = event.notification.data?.url || '/';
+  const targetUrl = event.notification?.data?.url || "/";
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then((clients) => {
-        for (const client of clients) {
-          if (client.url.includes(targetUrl)) {
-            return client.focus();
-          }
+    (async () => {
+      const windowClients = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      for (const client of windowClients) {
+        // Якщо вже є вкладка з цим URL — фокусуємо її
+        if (client.url.includes(targetUrl)) {
+          return client.focus();
         }
-        return self.clients.openWindow(targetUrl);
-      })
+      }
+
+      // Інакше відкриваємо нову вкладку
+      return self.clients.openWindow(targetUrl);
+    })()
   );
 });
