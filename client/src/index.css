@@ -56,7 +56,7 @@
 
 .custom-marker-icon .marker-core {
   transform-origin: 50% 50%;
-  animation: marker-pop 220ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  animation: marker-pop 280ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
 }
 
 .custom-marker-icon .pulse-ring {
