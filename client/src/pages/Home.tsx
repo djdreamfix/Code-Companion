@@ -26,133 +26,113 @@ L.Marker.prototype.options.icon = DefaultIcon;
 // --- Custom Components for Map Interaction ---
 
 function MarkerWithTimer({ mark }: { mark: Mark }) {
-  const [timeLeft, setTimeLeft] = useState("");
-
-  useEffect(() => {
-  let intervalId: number | null = null;
-
-  const updateTimer = () => {
-    const remaining = Math.max(0, new Date(mark.expiresAt).getTime() - Date.now());
-    const minutes = Math.floor(remaining / 60000);
-    const seconds = Math.floor((remaining % 60000) / 1000);
-    setTimeLeft(`${minutes}:${seconds.toString().padStart(2, "0")}`);
-  };
-
-  const start = () => {
-    // щоб не було двох інтервалів
-    if (intervalId !== null) window.clearInterval(intervalId);
-    updateTimer();
-    intervalId = window.setInterval(updateTimer, 1000);
-  };
-
-  const stop = () => {
-    if (intervalId !== null) {
-      window.clearInterval(intervalId);
-      intervalId = null;
-    }
-  };
-
-  const onVisibilityChange = () => {
-    if (document.visibilityState === "visible") {
-      start(); // повернулися в додаток — перезапускаємо
-    } else {
-      stop();  // пішли у фон — прибираємо інтервал
-    }
-  };
-
-  // старт одразу
-  start();
-
-  // “пробудження” після фону / повернення на вкладку
-  document.addEventListener("visibilitychange", onVisibilityChange);
-
-  // iOS інколи краще реагує ще й на focus/blur
-  window.addEventListener("focus", start);
-  window.addEventListener("blur", stop);
-
-  return () => {
-    stop();
-    document.removeEventListener("visibilitychange", onVisibilityChange);
-    window.removeEventListener("focus", start);
-    window.removeEventListener("blur", stop);
-  };
-}, [mark.expiresAt]);
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [mark.expiresAt]);
+  const markerRef = useRef<L.Marker>(null);
 
   const colorHex =
     mark.color === "blue" ? "#3b82f6" : mark.color === "green" ? "#22c55e" : "#9333ea";
 
-  const icon = divIcon({
-    html: `
-      <div class="relative flex items-center justify-center">
-        <div class="pulse-ring" style="background-color: ${colorHex}"></div>
-        <div style="
-          background-color: ${colorHex};
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          border: 2px solid white;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-weight: bold;
-          font-size: 10px;
-          font-family: sans-serif;
-          z-index: 2;
-        ">
-      <div class="marker-core" style="
-        background-color: ${colorHex};
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        border: 2px solid white;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        font-size: 10px;
-        font-family: sans-serif;
-        z-index: 2;
-      ">
-        ${timeLeft}
-      </div>
+  // Статична іконка (не залежить від timeLeft)
+  const icon = useRef(
+    divIcon({
+      html: `
+        <div class="relative flex items-center justify-center">
+          <div class="pulse-ring" style="background-color: ${colorHex}"></div>
 
-        </div>
-        ${
-          mark.color === "split"
-            ? `
-          <div style="
-            position: absolute;
-            top: 0;
-            left: 0;
+          <div class="marker-core" style="
+            background-color: ${colorHex};
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            border: 2px solid transparent;
-            background: linear-gradient(90deg, #3b82f6 50%, #22c55e 50%);
-            z-index: 1;
-          "></div>
-        `
-            : ""
-        }
-      </div>
-    `,
-    className: "custom-marker-icon",
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -18],
-  });
+            border: 2px solid white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 10px;
+            font-family: sans-serif;
+            z-index: 2;
+          ">
+            <span class="time-left">--:--</span>
+          </div>
+
+          ${
+            mark.color === "split"
+              ? `
+            <div style="
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 36px;
+              height: 36px;
+              border-radius: 50%;
+              border: 2px solid transparent;
+              background: linear-gradient(90deg, #3b82f6 50%, #22c55e 50%);
+              z-index: 1;
+            "></div>
+          `
+              : ""
+          }
+        </div>
+      `,
+      className: "custom-marker-icon",
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
+      popupAnchor: [0, -18],
+    })
+  ).current;
+
+  useEffect(() => {
+    let intervalId: number | null = null;
+
+    const updateTimer = () => {
+      const remaining = Math.max(0, new Date(mark.expiresAt).getTime() - Date.now());
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      const text = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+
+      const el = markerRef.current?.getElement();
+      const timeEl = el?.querySelector(".time-left");
+      if (timeEl) timeEl.textContent = text;
+    };
+
+    const start = () => {
+      if (intervalId !== null) window.clearInterval(intervalId);
+      updateTimer();
+      intervalId = window.setInterval(updateTimer, 1000);
+    };
+
+    const stop = () => {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") start();
+      else stop();
+    };
+
+    // старт одразу
+    start();
+
+    // коректно для фону/повернення (iOS теж)
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", start);
+    window.addEventListener("blur", stop);
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", start);
+      window.removeEventListener("blur", stop);
+    };
+  }, [mark.expiresAt]);
 
   return (
-    <Marker position={[mark.lat, mark.lng]} icon={icon}>
+    <Marker ref={markerRef as any} position={[mark.lat, mark.lng]} icon={icon}>
       <Popup>
         <MarkPopup mark={mark} />
       </Popup>
@@ -175,11 +155,10 @@ function MapEvents({
 
   useMapEvents({
     click(e) {
-      if (isAddingMode) {
-        onMapClick(e.latlng.lat, e.latlng.lng);
-      }
+      if (isAddingMode) onMapClick(e.latlng.lat, e.latlng.lng);
     },
   });
+
   return null;
 }
 
@@ -214,31 +193,22 @@ function LocationMarker() {
 // --- Main Page Component ---
 
 export default function Home() {
-  // State
   const [isAddingMode, setIsAddingMode] = useState(false);
   const [selectedColor, setSelectedColor] = useState<MarkColor>("blue");
-  const [mapCenter] = useState<[number, number]>([50.4501, 30.5234]); // За замовчуванням: Київ
+  const [mapCenter] = useState<[number, number]>([50.4501, 30.5234]); // Київ
 
-  // Hooks
   const { data: marks, isLoading } = useMarks();
   const createMark = useCreateMark();
-  useSocket(); // Initialize socket connection
+  useSocket();
   const { isSupported, isSubscribed, subscribe } = usePushNotifications();
   const { toast } = useToast();
   const mapRef = useRef<L.Map>(null);
 
-  // Handlers
-  const handleAddClick = () => {
-    setIsAddingMode(true);
-  };
+  const handleAddClick = () => setIsAddingMode(true);
 
   const handleMapClick = async (lat: number, lng: number) => {
     try {
-      await createMark.mutateAsync({
-        lat,
-        lng,
-        color: selectedColor,
-      });
+      await createMark.mutateAsync({ lat, lng, color: selectedColor });
 
       setIsAddingMode(false);
       toast({
@@ -246,7 +216,7 @@ export default function Home() {
         description: "Ваша мітка тепер видима всім поруч.",
         className: "bg-green-500 text-white border-none",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Не вдалося додати мітку",
         description: "Будь ласка, спробуйте ще раз.",
@@ -257,55 +227,6 @@ export default function Home() {
 
   const handleLocateMe = () => {
     mapRef.current?.locate({ setView: true, maxZoom: 16 });
-  };
-
-  // Custom Icon Generator
-  const createCustomIcon = (color: MarkColor) => {
-    const colorHex =
-      color === "blue" ? "#3b82f6" : color === "green" ? "#22c55e" : "#9333ea";
-
-    const html = `
-      <div class="relative group">
-        <div class="pulse-ring" style="background-color: ${colorHex}"></div>
-        <div style="
-          background-color: ${colorHex};
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          border: 3px solid white;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        ">
-        </div>
-        ${
-          color === "split"
-            ? `
-        <div style="
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          border: 3px solid transparent;
-          background: linear-gradient(90deg, #3b82f6 50%, #22c55e 50%);
-          z-index: 1;
-        "></div>
-        `
-            : ""
-        }
-      </div>
-    `;
-
-    return divIcon({
-      html,
-      className: "custom-marker-icon",
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
-      popupAnchor: [0, -12],
-    });
   };
 
   if (isLoading) {
@@ -334,6 +255,7 @@ export default function Home() {
         />
 
         <MapEvents isAddingMode={isAddingMode} onMapClick={handleMapClick} />
+        <LocationMarker />
 
         {marks?.map((mark) => (
           <MarkerWithTimer key={mark.id} mark={mark} />
