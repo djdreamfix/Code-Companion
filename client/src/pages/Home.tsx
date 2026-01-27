@@ -29,12 +29,54 @@ function MarkerWithTimer({ mark }: { mark: Mark }) {
   const [timeLeft, setTimeLeft] = useState("");
 
   useEffect(() => {
-    const updateTimer = () => {
-      const remaining = Math.max(0, new Date(mark.expiresAt).getTime() - Date.now());
-      const minutes = Math.floor(remaining / 60000);
-      const seconds = Math.floor((remaining % 60000) / 1000);
-      setTimeLeft(`${minutes}:${seconds.toString().padStart(2, "0")}`);
-    };
+  let intervalId: number | null = null;
+
+  const updateTimer = () => {
+    const remaining = Math.max(0, new Date(mark.expiresAt).getTime() - Date.now());
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
+    setTimeLeft(`${minutes}:${seconds.toString().padStart(2, "0")}`);
+  };
+
+  const start = () => {
+    // щоб не було двох інтервалів
+    if (intervalId !== null) window.clearInterval(intervalId);
+    updateTimer();
+    intervalId = window.setInterval(updateTimer, 1000);
+  };
+
+  const stop = () => {
+    if (intervalId !== null) {
+      window.clearInterval(intervalId);
+      intervalId = null;
+    }
+  };
+
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "visible") {
+      start(); // повернулися в додаток — перезапускаємо
+    } else {
+      stop();  // пішли у фон — прибираємо інтервал
+    }
+  };
+
+  // старт одразу
+  start();
+
+  // “пробудження” після фону / повернення на вкладку
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  // iOS інколи краще реагує ще й на focus/blur
+  window.addEventListener("focus", start);
+  window.addEventListener("blur", stop);
+
+  return () => {
+    stop();
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.removeEventListener("focus", start);
+    window.removeEventListener("blur", stop);
+  };
+}, [mark.expiresAt]);
 
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
