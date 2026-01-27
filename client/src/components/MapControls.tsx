@@ -1,5 +1,11 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Bell, BellOff, Navigation } from "lucide-react";
+import {
+  Plus,
+  Bell,
+  BellOff,
+  Navigation,
+  RefreshCw, // ✅ додали
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkColor } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -32,10 +38,32 @@ export function MapControls({
     visible: { opacity: 1, y: 0 },
   };
 
+  const handleRefresh = () => {
+    // Найнадійніше оновлення для PWA/Safari
+    window.location.reload();
+  };
+
   return (
     <>
-      {/* Кнопки справа зверху */}
-<div className="absolute right-4 z-[1000] flex flex-col gap-3 top-[calc(env(safe-area-inset-top)+32px)]">
+      {/* Top Right Controls */}
+      <div
+        className="absolute right-4 z-[1000] flex flex-col gap-3"
+        style={{
+          top: "calc(env(safe-area-inset-top) + 1rem)", // ✅ notch-safe
+        }}
+      >
+        {/* ✅ Refresh */}
+        <Button
+          variant="secondary"
+          size="icon"
+          onClick={handleRefresh}
+          className="glass-panel rounded-full h-12 w-12 shadow-xl text-primary hover:scale-105 active:scale-95 transition-all"
+          aria-label="Оновити сторінку"
+          title="Оновити"
+        >
+          <RefreshCw className="h-5 w-5" />
+        </Button>
+
         {notificationsSupported && (
           <Button
             variant="secondary"
@@ -47,17 +75,10 @@ export function MapControls({
                 ? "bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-500/20"
                 : "text-muted-foreground hover:text-primary"
             )}
-            title={
-              notificationsEnabled
-                ? "Сповіщення увімкнено"
-                : "Увімкнути сповіщення"
-            }
+            aria-label={notificationsEnabled ? "Вимкнути сповіщення" : "Увімкнути сповіщення"}
+            title={notificationsEnabled ? "Сповіщення: увімкнено" : "Сповіщення: вимкнено"}
           >
-            {notificationsEnabled ? (
-              <Bell className="h-5 w-5" />
-            ) : (
-              <BellOff className="h-5 w-5" />
-            )}
+            {notificationsEnabled ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
           </Button>
         )}
 
@@ -66,13 +87,14 @@ export function MapControls({
           size="icon"
           onClick={onLocateMe}
           className="glass-panel rounded-full h-12 w-12 shadow-xl text-primary hover:scale-105 active:scale-95 transition-all"
-          title="Показати моє місцезнаходження"
+          aria-label="Показати моє місцезнаходження"
+          title="Моє місцезнаходження"
         >
           <Navigation className="h-5 w-5" />
         </Button>
       </div>
 
-      {/* Центральні кнопки знизу */}
+      {/* Bottom Center Controls */}
       <div className="absolute bottom-8 left-0 right-0 z-[1000] flex flex-col items-center px-4 pointer-events-none">
         <AnimatePresence mode="wait">
           {!isAddingMode ? (
@@ -105,21 +127,19 @@ export function MapControls({
                 color="blue"
                 selected={selectedColor === "blue"}
                 onClick={() => onColorSelect("blue")}
-                label="Синя"
+                label="Спокій"
               />
-
               <ColorOption
                 color="green"
                 selected={selectedColor === "green"}
                 onClick={() => onColorSelect("green")}
-                label="Зелена"
+                label="Актив"
               />
-
               <ColorOption
                 color="split"
                 selected={selectedColor === "split"}
                 onClick={() => onColorSelect("split")}
-                label="Змішана"
+                label="Дикий"
               />
 
               <div className="w-px h-8 bg-border mx-1" />
@@ -141,7 +161,7 @@ export function MapControls({
             animate={{ opacity: 1, y: 0 }}
             className="bg-black/70 text-white px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium shadow-lg pointer-events-auto"
           >
-            Натисніть на мапі, щоб розмістити мітку
+            Натисни на мапі, щоб поставити мітку
           </motion.div>
         )}
       </div>
@@ -165,10 +185,10 @@ function ColorOption({
       onClick={onClick}
       className={cn(
         "relative flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-200",
-        selected
-          ? "bg-accent/10 scale-105 ring-2 ring-accent"
-          : "hover:bg-muted"
+        selected ? "bg-accent/10 scale-105 ring-2 ring-accent" : "hover:bg-muted"
       )}
+      aria-label={label}
+      title={label}
     >
       <div
         className={cn(
@@ -178,7 +198,6 @@ function ColorOption({
           color === "split" && "bg-gradient-to-r from-blue-500 to-green-500"
         )}
       />
-
       <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
