@@ -106,7 +106,25 @@ function MarkerWithTimer({ mark }: { mark: Mark }) {
           font-family: sans-serif;
           z-index: 2;
         ">
-          ${timeLeft}
+      <div class="marker-core" style="
+        background-color: ${colorHex};
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 10px;
+        font-family: sans-serif;
+        z-index: 2;
+      ">
+        ${timeLeft}
+      </div>
+
         </div>
         ${
           mark.color === "split"
