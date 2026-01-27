@@ -127,19 +127,19 @@ export function MapControls({
                 color="blue"
                 selected={selectedColor === "blue"}
                 onClick={() => onColorSelect("blue")}
-                label="Спокій"
+                label="Синя"
               />
               <ColorOption
                 color="green"
                 selected={selectedColor === "green"}
                 onClick={() => onColorSelect("green")}
-                label="Актив"
+                label="Зелена"
               />
               <ColorOption
                 color="split"
                 selected={selectedColor === "split"}
                 onClick={() => onColorSelect("split")}
-                label="Дикий"
+                label="Змішана"
               />
 
               <div className="w-px h-8 bg-border mx-1" />
