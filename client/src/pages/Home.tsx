@@ -31,11 +31,28 @@ function MarkerWithTimer({ mark }: { mark: Mark }) {
   const colorHex =
     mark.color === "blue" ? "#3b82f6" : mark.color === "green" ? "#22c55e" : "#9333ea";
 
+  const noteShort = mark.note
+    ? mark.note.length > 15
+      ? `${mark.note.slice(0, 15)}…`
+      : mark.note
+    : "";
+
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+
+  const noteHtml = noteShort ? escapeHtml(noteShort) : "";
+
+
   // Статична іконка (не залежить від timeLeft)
   const icon = useRef(
     divIcon({
       html: `
         <div class="relative flex items-center justify-center">
+          ${noteHtml ? `<div style="position:absolute; top:-18px; left:50%; transform:translateX(-50%); max-width:160px; padding:2px 6px; border-radius:8px; background:rgba(0,0,0,0.55); color:white; font-size:11px; line-height:1.1; font-family:sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none;">${noteHtml}</div>` : ""}
           <div class="pulse-ring" style="background-color: ${colorHex}"></div>
 
           <div class="marker-core" style="
@@ -195,6 +212,7 @@ function LocationMarker() {
 export default function Home() {
   const [isAddingMode, setIsAddingMode] = useState(false);
   const [selectedColor, setSelectedColor] = useState<MarkColor>("blue");
+  const [markNote, setMarkNote] = useState<string>("");
   const [mapCenter] = useState<[number, number]>([50.4501, 30.5234]); // Київ
 
   const { data: marks, isLoading } = useMarks();
@@ -211,6 +229,7 @@ export default function Home() {
       await createMark.mutateAsync({ lat, lng, color: selectedColor });
 
       setIsAddingMode(false);
+      setMarkNote("");
       toast({
         title: "Мітку додано!",
         description: "Ваша мітка тепер видима всім поруч.",
@@ -272,6 +291,9 @@ export default function Home() {
         onToggleNotifications={subscribe}
         notificationsEnabled={isSubscribed}
         notificationsSupported={isSupported}
+        markNote={markNote}
+        onMarkNoteChange={setMarkNote}
+        onRefresh={() => window.location.reload()}
       />
 
       {/* Brand Overlay */}

@@ -77,7 +77,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         createdAt: now,
         expiresAt,
         street: "Location",
-      });
+        note: input.note && input.note.length ? input.note : null,
+        });
 
       io.emit("mark.created", newMark);
 

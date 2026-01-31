@@ -9,6 +9,7 @@ export const marks = pgTable("marks", {
   lng: doublePrecision("lng").notNull(),
   color: text("color").notNull(), // 'blue' | 'green' | 'split'
   street: text("street"),
+  note: text("note"),
   createdAt: timestamp("created_at").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
 });
@@ -37,6 +38,7 @@ export const createMarkSchema = z.object({
   lat: z.number(),
   lng: z.number(),
   color: z.enum(['blue', 'green', 'split']),
+  note: z.string().trim().max(140).optional(),
 });
 
 export const subscribeSchema = z.object({

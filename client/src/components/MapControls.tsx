@@ -1,11 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Plus,
-  Bell,
-  BellOff,
-  Navigation,
-  RefreshCw, // ✅ додали
-} from "lucide-react";
+import { Plus, Bell, BellOff, Navigation, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkColor } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -20,6 +14,13 @@ interface MapControlsProps {
   onToggleNotifications: () => void;
   notificationsEnabled: boolean;
   notificationsSupported: boolean;
+
+  /** Короткий текст мітки */
+  markNote: string;
+  onMarkNoteChange: (value: string) => void;
+
+  /** Оновити сторінку */
+  onRefresh: () => void;
 }
 
 export function MapControls({
@@ -32,51 +33,34 @@ export function MapControls({
   onToggleNotifications,
   notificationsEnabled,
   notificationsSupported,
+  markNote,
+  onMarkNoteChange,
+  onRefresh,
 }: MapControlsProps) {
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 },
   };
 
-  const handleRefresh = () => {
-    // Найнадійніше оновлення для PWA/Safari
-    window.location.reload();
-  };
-
   return (
     <>
-      {/* Top Right Controls */}
+      {/* Верхній правий блок (з урахуванням notch / safe-area) */}
       <div
         className="absolute right-4 z-[1000] flex flex-col gap-3"
-        style={{
-          top: "calc(env(safe-area-inset-top) + 1rem)", // ✅ notch-safe
-        }}
+        style={{ top: "calc(env(safe-area-inset-top) + 1rem)" }}
       >
-        {/* ✅ Refresh */}
-        <Button
-          variant="secondary"
-          size="icon"
-          onClick={handleRefresh}
-          className="glass-panel rounded-full h-12 w-12 shadow-xl text-primary hover:scale-105 active:scale-95 transition-all"
-          aria-label="Оновити сторінку"
-          title="Оновити"
-        >
-          <RefreshCw className="h-5 w-5" />
-        </Button>
-
         {notificationsSupported && (
           <Button
             variant="secondary"
             size="icon"
             onClick={onToggleNotifications}
+            aria-label="Сповіщення"
             className={cn(
               "glass-panel rounded-full h-12 w-12 shadow-xl transition-all duration-300",
               notificationsEnabled
                 ? "bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-500/20"
                 : "text-muted-foreground hover:text-primary"
             )}
-            aria-label={notificationsEnabled ? "Вимкнути сповіщення" : "Увімкнути сповіщення"}
-            title={notificationsEnabled ? "Сповіщення: увімкнено" : "Сповіщення: вимкнено"}
           >
             {notificationsEnabled ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
           </Button>
@@ -86,15 +70,24 @@ export function MapControls({
           variant="secondary"
           size="icon"
           onClick={onLocateMe}
+          aria-label="Моє місце"
           className="glass-panel rounded-full h-12 w-12 shadow-xl text-primary hover:scale-105 active:scale-95 transition-all"
-          aria-label="Показати моє місцезнаходження"
-          title="Моє місцезнаходження"
         >
           <Navigation className="h-5 w-5" />
         </Button>
+
+        <Button
+          variant="secondary"
+          size="icon"
+          onClick={onRefresh}
+          aria-label="Оновити"
+          className="glass-panel rounded-full h-12 w-12 shadow-xl text-primary hover:scale-105 active:scale-95 transition-all"
+        >
+          <RefreshCw className="h-5 w-5" />
+        </Button>
       </div>
 
-      {/* Bottom Center Controls */}
+      {/* Нижній блок керування */}
       <div className="absolute bottom-8 left-0 right-0 z-[1000] flex flex-col items-center px-4 pointer-events-none">
         <AnimatePresence mode="wait">
           {!isAddingMode ? (
@@ -121,36 +114,45 @@ export function MapControls({
               initial="hidden"
               animate="visible"
               exit="hidden"
-              className="glass-panel p-2 rounded-2xl shadow-2xl flex items-center gap-2 pointer-events-auto mb-4"
+              className="glass-panel p-3 rounded-2xl shadow-2xl flex flex-col gap-3 pointer-events-auto mb-4 w-full max-w-md"
             >
-              <ColorOption
-                color="blue"
-                selected={selectedColor === "blue"}
-                onClick={() => onColorSelect("blue")}
-                label="Синя"
-              />
-              <ColorOption
-                color="green"
-                selected={selectedColor === "green"}
-                onClick={() => onColorSelect("green")}
-                label="Зелена"
-              />
-              <ColorOption
-                color="split"
-                selected={selectedColor === "split"}
-                onClick={() => onColorSelect("split")}
-                label="Змішана"
-              />
+              <div className="flex items-center gap-2 justify-center">
+                <ColorOption
+                  color="blue"
+                  selected={selectedColor === "blue"}
+                  onClick={() => onColorSelect("blue")}
+                  label="Спокій"
+                />
+                <ColorOption
+                  color="green"
+                  selected={selectedColor === "green"}
+                  onClick={() => onColorSelect("green")}
+                  label="Актив"
+                />
+                <ColorOption
+                  color="split"
+                  selected={selectedColor === "split"}
+                  onClick={() => onColorSelect("split")}
+                  label="Подія"
+                />
+              </div>
 
-              <div className="w-px h-8 bg-border mx-1" />
-
-              <Button
-                variant="ghost"
-                onClick={onCancelAdd}
-                className="rounded-xl hover:bg-destructive/10 hover:text-destructive font-medium"
-              >
-                Скасувати
-              </Button>
+              <div className="flex items-center gap-2">
+                <input
+                  value={markNote}
+                  onChange={(e) => onMarkNoteChange(e.target.value)}
+                  maxLength={140}
+                  placeholder="Короткий текст (до 140 символів)"
+                  className="flex-1 h-10 px-3 rounded-xl bg-white/70 border border-border text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+                <Button
+                  variant="ghost"
+                  onClick={onCancelAdd}
+                  className="rounded-xl hover:bg-destructive/10 hover:text-destructive font-medium"
+                >
+                  Скасувати
+                </Button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -161,7 +163,7 @@ export function MapControls({
             animate={{ opacity: 1, y: 0 }}
             className="bg-black/70 text-white px-4 py-2 rounded-full backdrop-blur-md text-sm font-medium shadow-lg pointer-events-auto"
           >
-            Натисни на мапі, щоб поставити мітку
+            Торкніться будь-де на мапі, щоб поставити мітку
           </motion.div>
         )}
       </div>
@@ -187,8 +189,6 @@ function ColorOption({
         "relative flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-200",
         selected ? "bg-accent/10 scale-105 ring-2 ring-accent" : "hover:bg-muted"
       )}
-      aria-label={label}
-      title={label}
     >
       <div
         className={cn(

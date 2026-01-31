@@ -41,6 +41,13 @@ export function MarkPopup({ mark }: MarkPopupProps) {
         </p>
       </div>
 
+      {mark.note && mark.note.trim().length > 0 && (
+        <div className="mb-3">
+          <p className="text-xs font-semibold text-muted-foreground mb-1">Текст мітки</p>
+          <p className="text-sm text-foreground leading-snug break-words">{mark.note}</p>
+        </div>
+      )}
+
       <div className="space-y-1.5 pt-3 border-t border-border">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Clock className="w-3.5 h-3.5" />
