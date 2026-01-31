@@ -11,7 +11,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import L from "leaflet";
 
-// Fix Leaflet's default icon path issues in React
 import icon from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
@@ -46,13 +45,15 @@ function MarkerWithTimer({ mark }: { mark: Mark }) {
 
   const noteHtml = noteShort ? escapeHtml(noteShort) : "";
 
-
-  // Статична іконка (не залежить від timeLeft)
   const icon = useRef(
     divIcon({
       html: `
         <div class="relative flex items-center justify-center">
-          ${noteHtml ? `<div style="position:absolute; top:-18px; left:50%; transform:translateX(-50%); max-width:160px; padding:2px 6px; border-radius:8px; background:rgba(0,0,0,0.55); color:white; font-size:11px; line-height:1.1; font-family:sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none;">${noteHtml}</div>` : ""}
+          ${
+            noteHtml
+              ? `<div style="position:absolute; top:-18px; left:50%; transform:translateX(-50%); max-width:160px; padding:2px 6px; border-radius:8px; background:rgba(0,0,0,0.55); color:white; font-size:11px; line-height:1.1; font-family:sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none;">${noteHtml}</div>`
+              : ""
+          }
           <div class="pulse-ring" style="background-color: ${colorHex}"></div>
 
           <div class="marker-core" style="
@@ -132,10 +133,8 @@ function MarkerWithTimer({ mark }: { mark: Mark }) {
       else stop();
     };
 
-    // старт одразу
     start();
 
-    // коректно для фону/повернення (iOS теж)
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("focus", start);
     window.addEventListener("blur", stop);
@@ -226,10 +225,18 @@ export default function Home() {
 
   const handleMapClick = async (lat: number, lng: number) => {
     try {
-      await createMark.mutateAsync({ lat, lng, color: selectedColor });
+      const noteToSend = markNote.trim() ? markNote.trim() : undefined;
+
+      await createMark.mutateAsync({
+        lat,
+        lng,
+        color: selectedColor,
+        ...(noteToSend ? { note: noteToSend } : {}),
+      });
 
       setIsAddingMode(false);
       setMarkNote("");
+
       toast({
         title: "Мітку додано!",
         description: "Ваша мітка тепер видима всім поруч.",
@@ -296,7 +303,6 @@ export default function Home() {
         onRefresh={() => window.location.reload()}
       />
 
-      {/* Brand Overlay */}
       <div className="absolute top-4 left-4 z-[-1] pointer-events-none">
         <div className="glass-panel px-4 py-2 rounded-xl flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
