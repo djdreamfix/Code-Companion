@@ -5,32 +5,31 @@ import { z } from "zod";
 
 type CreateMarkInput = z.infer<typeof createMarkSchema>;
 
+function normalizeCreateMarkInput(data: CreateMarkInput): CreateMarkInput {
+  // Перетворюємо "   " -> undefined, щоб не відправляти порожній note
+  const note = data.note?.trim();
+  const street = (data as any).street?.trim?.(); // якщо ти додаси street у schema
+
+  return {
+    ...data,
+    ...(note ? { note } : { note: undefined }),
+    ...(street ? { street } : {}),
+  } as CreateMarkInput;
+}
+
 export function useMarks() {
   return useQuery({
     queryKey: [api.marks.list.path],
     queryFn: async () => {
-      const res = await fetch(api.marks.list.path);
+      const res = await fetch(api.marks.list.path, { cache: "no-store" });
       if (!res.ok) throw new Error("Не вдалося отримати мітки");
       return api.marks.list.responses[200].parse(await res.json());
     },
 
-    /**
-     * ВАЖЛИВО для iPhone/Android:
-     * Коли PWA/вкладка не активна — таймери та сокети можуть “заснути”.
-     * Тому при поверненні в додаток ми примусово оновлюємо список.
-     */
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-
-    /**
-     * Підтягувати мітки періодично (під твій cleanup на сервері кожні 10с).
-     * У фоні браузер може приглушити інтервал — це нормально, але при поверненні
-     * refetchOnWindowFocus все одно оновить.
-     */
     refetchInterval: 10_000,
     refetchIntervalInBackground: false,
-
-    // Щоб при фокусі завжди робився запит, а не “вважалося свіжим”
     staleTime: 0,
   });
 }
@@ -39,7 +38,16 @@ export function useCreateMark() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: CreateMarkInput) => {
+    mutationFn: async (raw: CreateMarkInput) => {
+      const data = normalizeCreateMarkInput(raw);
+
+      // Діагностика: один раз глянеш у console і буде ясно чи note взагалі є.
+      // Можеш потім прибрати.
+      if (typeof window !== "undefined") {
+        // eslint-disable-next-line no-console
+        console.log("POST /api/marks payload:", data);
+      }
+
       const res = await fetch(api.marks.create.path, {
         method: api.marks.create.method,
         headers: { "Content-Type": "application/json" },
@@ -47,7 +55,6 @@ export function useCreateMark() {
       });
 
       if (!res.ok) {
-        // сервер може повертати { error: "..."} або { message: "..." }
         let errorText = "Не вдалося створити мітку";
         try {
           const err = await res.json();
@@ -62,7 +69,6 @@ export function useCreateMark() {
     },
 
     onSuccess: () => {
-      // Одразу підтягуємо актуальний список
       queryClient.invalidateQueries({ queryKey: [api.marks.list.path] });
     },
   });
