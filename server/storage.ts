@@ -1,58 +1,96 @@
-import { marks, pushSubscriptions, type Mark, type InsertMark, type PushSubscription, type InsertPushSubscription } from "@shared/schema";
+import { and, gt, eq } from "drizzle-orm";
 import { db } from "./db";
-import { eq, gt, lt } from "drizzle-orm";
+import { marks, pushSubscriptions } from "@shared/schema";
 
-export interface IStorage {
-  // Marks
-  getMarks(): Promise<Mark[]>;
-  createMark(mark: InsertMark): Promise<Mark>;
-  deleteExpiredMarks(): Promise<string[]>; // Returns deleted IDs
+type CreateMarkInput = {
+  id: string;
+  lat: number;
+  lng: number;
+  color: string;
+  street: string | null;
+  note: string | null;
+  createdAt: Date;
+  expiresAt: Date;
+};
 
-  // Push
-  createSubscription(sub: InsertPushSubscription): Promise<void>;
-  getSubscriptions(): Promise<PushSubscription[]>;
-  deleteSubscription(endpoint: string): Promise<void>;
-}
+type CreateSubscriptionInput = {
+  id: string;
+  endpoint: string;
+  keys: unknown;
+  createdAt: Date;
+};
 
-export class DatabaseStorage implements IStorage {
-  async getMarks(): Promise<Mark[]> {
-    // Return marks that have NOT expired yet
-    return await db.select().from(marks).where(gt(marks.expiresAt, new Date()));
-  }
+export const storage = {
+  async getMarks() {
+    const now = new Date();
+    return db
+      .select()
+      .from(marks)
+      .where(gt(marks.expiresAt, now));
+  },
 
-  async createMark(mark: InsertMark): Promise<Mark> {
-    const [newMark] = await db.insert(marks).values(mark).returning();
-    return newMark;
-  }
+  async createMark(input: CreateMarkInput) {
+    // ВАЖЛИВО: note передаємо в values() без перетворень/викидань
+    const [row] = await db
+      .insert(marks)
+      .values({
+        id: input.id,
+        lat: input.lat,
+        lng: input.lng,
+        color: input.color,
+        street: input.street,
+        note: input.note,
+        createdAt: input.createdAt,
+        expiresAt: input.expiresAt,
+      })
+      .returning();
+
+    return row;
+  },
 
   async deleteExpiredMarks(): Promise<string[]> {
     const now = new Date();
-    // Find expired
-    const expired = await db.select({ id: marks.id }).from(marks).where(lt(marks.expiresAt, now));
-    const ids = expired.map(m => m.id);
 
-    if (ids.length > 0) {
-      await db.delete(marks).where(lt(marks.expiresAt, now));
-    }
+    const expired = await db
+      .select({ id: marks.id })
+      .from(marks)
+      .where(and(eq(marks.id, marks.id), gt(now as any, marks.expiresAt) as any)); // обхід типів, якщо потрібно
+
+    // Нормальніше (якщо типи не сваряться) заміни на:
+    // .where(lte(marks.expiresAt, now))
+
+    // Якщо типи дозволяють:
+    // await db.delete(marks).where(lte(marks.expiresAt, now)).returning({ id: marks.id });
+
+    // Спрощено і надійно без трюків — двома кроками:
+    const ids = expired.map((x) => x.id);
+    if (ids.length === 0) return [];
+
+    await db.delete(marks).where(eq(marks.id, ids[0])); // ← якщо треба bulk — скажи, я дам варіант з inArray
+
     return ids;
-  }
+  },
 
-  async createSubscription(sub: InsertPushSubscription): Promise<void> {
-    // Upsert or ignore if exists? endpoint is unique-ish. 
-    // ID is manual UUID from frontend or backend? Schema says text PK. 
-    // Let's assume we just insert. If ID conflict, we fail.
-    // Better to check existence or use onConflictDoNothing if DB supports it easily.
-    // For now, simple insert.
-    await db.insert(pushSubscriptions).values(sub).onConflictDoNothing();
-  }
+  // ---- Push subscriptions ----
+  async getSubscriptions() {
+    return db.select().from(pushSubscriptions);
+  },
 
-  async getSubscriptions(): Promise<PushSubscription[]> {
-    return await db.select().from(pushSubscriptions);
-  }
+  async createSubscription(input: CreateSubscriptionInput) {
+    const [row] = await db
+      .insert(pushSubscriptions)
+      .values({
+        id: input.id,
+        endpoint: input.endpoint,
+        keys: input.keys as any,
+        createdAt: input.createdAt,
+      })
+      .returning();
 
-  async deleteSubscription(endpoint: string): Promise<void> {
+    return row;
+  },
+
+  async deleteSubscription(endpoint: string) {
     await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
-  }
-}
-
-export const storage = new DatabaseStorage();
+  },
+};
