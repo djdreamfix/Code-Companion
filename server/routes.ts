@@ -13,7 +13,7 @@ function isVapidMismatch(err: any) {
   return (
     err?.statusCode === 403 ||
     msg.includes("VapidPkHashMismatch") ||
-    msg.toLowerCase().includes("vapid") && msg.toLowerCase().includes("mismatch")
+    (msg.toLowerCase().includes("vapid") && msg.toLowerCase().includes("mismatch"))
   );
 }
 
@@ -66,6 +66,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const input = api.marks.create.input.parse(req.body);
 
+      // Нормалізація (після schema transform note/street вже або string, або undefined)
+      const note = input.note ?? null;
+      const street = input.street ?? "Location";
+
       const now = new Date();
       const expiresAt = new Date(now.getTime() + 30 * 60 * 1000);
 
@@ -76,20 +80,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         color: input.color,
         createdAt: now,
         expiresAt,
-        street: "Location",
-        note: input.note && input.note.length ? input.note : null,
-        });
+        street,
+        note,
+      });
 
       io.emit("mark.created", newMark);
 
       // Push (only if enabled)
       if (webPushEnabled) {
         const colorUa =
-          input.color === "blue"
-            ? "синю"
-            : input.color === "green"
-            ? "зелену"
-            : "змішану";
+          input.color === "blue" ? "синю" : input.color === "green" ? "зелену" : "змішану";
 
         const payload = JSON.stringify({
           title: "Нова мітка!",
@@ -117,7 +117,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
               // VAPID mismatch = subscription created with another VAPID public key
               if (isVapidMismatch(err)) {
-                console.error("webpush vapid mismatch -> deleting subscription", sub.endpoint);
+                console.error(
+                  "webpush vapid mismatch -> deleting subscription",
+                  sub.endpoint
+                );
                 await storage.deleteSubscription(sub.endpoint);
                 return;
               }
@@ -133,6 +136,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (err instanceof z.ZodError) {
         res.status(400).json({ error: err.message });
       } else {
+        console.error("Create mark error:", err);
         res.status(500).json({ error: "Internal Server Error" });
       }
     }
@@ -147,8 +151,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const input = api.push.subscribe.input.parse(req.body);
 
-      // Рекомендація: бажано робити upsert по endpoint, щоб не плодити дублікати.
-      // Якщо ваш storage.createSubscription вже так робить — ок.
       await storage.createSubscription({
         id: randomUUID(),
         endpoint: input.endpoint,
